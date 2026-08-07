@@ -9,4 +9,19 @@ If Vercel asks for settings, use:
 - Build command: `pnpm run build`
 - Output directory: `dist`
 
-Task data is stored locally in each user's browser.
+Task data is cached locally and syncs to Supabase after sign-in.
+
+The workspace explicitly permits esbuild's required installation script so
+pnpm's strict build-script policy works in Vercel's CI environment.
+
+## Supabase
+
+The app expects these Vercel environment variables:
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
+
+The SQL schema and row-level security policies are included under
+`supabase/migrations`. After deploying, sign in from the app with an email link.
+Existing browser tasks are imported automatically when the cloud account is
+empty.
