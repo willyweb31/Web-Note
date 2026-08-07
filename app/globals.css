@@ -10,6 +10,10 @@ button { cursor: pointer; }
 .header-actions { display: flex; gap: 24px; align-items: center; }
 .saved-label { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 7px; }
 .saved-dot { width: 7px; height: 7px; background: #56a17e; border-radius: 50%; }
+.sync-error { color: #a2472e; }
+.sync-error .saved-dot { background: #d05c3d; }
+.account-button { border: 0; border-bottom: 1px solid #aab1ad; background: transparent; color: var(--ink); padding: 7px 2px; font-size: 12px; font-weight: 650; }
+.account-button:hover { color: var(--green); border-color: var(--green); }
 .add-button, .submit-button, .start-button { border: 0; border-radius: 3px; background: var(--green); color: white; font-weight: 650; padding: 12px 18px; box-shadow: 0 5px 16px rgba(39,92,73,.14); transition: transform .18s, background .18s; }
 .add-button:hover, .submit-button:hover, .start-button:hover { transform: translateY(-1px); background: #1d493a; }
 .add-button span { font-size: 18px; margin-right: 4px; }
@@ -75,10 +79,20 @@ select:focus, input:focus { border-color: #779b8c; box-shadow: 0 0 0 3px rgba(39
 .form-note { color: var(--muted); font-size: 12px; margin: 24px 0; }
 .form-note span { color: #d49451; margin-right: 6px; }
 .submit-button { width: 100%; padding: 15px; }
+.auth-form { width: min(520px, 100%); }
+.auth-intro { color: var(--muted); font-size: 14px; line-height: 1.65; margin: -8px 0 24px; }
+.auth-error { color: #a2472e; background: #f9e5df; padding: 10px 12px; font-size: 12px; margin: 14px 0; }
+.auth-form .submit-button { margin-top: 20px; }
+.privacy-note { color: #929a96; font-size: 11px; text-align: center; margin: 14px 0 0; }
+.auth-success { text-align: center; padding: 18px 14px 10px; }
+.auth-success > span { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #e2ece7; color: var(--green); font-size: 20px; }
+.auth-success h3 { font-family: var(--font-serif); font-weight: 400; font-size: 24px; margin: 18px 0 8px; }
+.auth-success p { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0; }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
 @media (max-width: 760px) {
   .topbar { padding: 0 18px; height: 68px; }
+  .header-actions { gap: 12px; }
   .saved-label { display: none; }
   .add-button { padding: 10px 13px; }
   .page { width: min(100% - 32px, 1180px); padding-top: 44px; }

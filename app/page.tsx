@@ -1,6 +1,6 @@
-"use client";
-
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase, supabaseConfigured } from "../src/supabase";
 
 type Task = {
   id: string;
@@ -12,6 +12,19 @@ type Task = {
   done: boolean;
   createdAt: number;
 };
+
+type TaskRow = {
+  id: string;
+  title: string;
+  course: string;
+  due_date: string;
+  effort: number;
+  importance: number;
+  completed: boolean;
+  created_at: string;
+};
+
+type SyncState = "local" | "syncing" | "synced" | "error";
 
 const STORAGE_KEY = "semester-focus-tasks-v1";
 const COURSE_COLORS: Record<string, string> = {
@@ -61,11 +74,45 @@ function priorityLabel(task: Task) {
   return value >= 21 ? "Do first" : value >= 16 ? "Plan next" : "On deck";
 }
 
+function fromRow(row: TaskRow): Task {
+  return {
+    id: row.id,
+    title: row.title,
+    course: row.course,
+    due: row.due_date,
+    effort: row.effort,
+    importance: row.importance,
+    done: row.completed,
+    createdAt: new Date(row.created_at).getTime(),
+  };
+}
+
+function toRow(task: Task, userId: string) {
+  return {
+    user_id: userId,
+    id: task.id,
+    title: task.title,
+    course: task.course,
+    due_date: task.due,
+    effort: task.effort,
+    importance: task.importance,
+    completed: task.done,
+    created_at: new Date(task.createdAt).toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>(starterTasks);
   const [ready, setReady] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [syncState, setSyncState] = useState<SyncState>("local");
   const [filter, setFilter] = useState("All courses");
   const [showForm, setShowForm] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authSent, setAuthSent] = useState(false);
+  const [authError, setAuthError] = useState("");
   const [title, setTitle] = useState("");
   const [course, setCourse] = useState("Biology");
   const [due, setDue] = useState(dateOffset(1));
@@ -84,22 +131,87 @@ export default function Home() {
     if (ready) localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
   }, [tasks, ready]);
 
-  const active = useMemo(
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) setSession(data.session);
+    });
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (active) setSession(nextSession);
+    });
+    return () => {
+      active = false;
+      data.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready || !session) return;
+    void syncFromCloud(session.user.id);
+    // A fresh session is the boundary for importing or downloading tasks.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, session?.user.id]);
+
+  async function syncFromCloud(userId: string) {
+    if (!supabase) return;
+    setSyncState("syncing");
+    const { data, error } = await supabase
+      .from("tasks")
+      .select("id,title,course,due_date,effort,importance,completed,created_at")
+      .order("created_at", { ascending: true });
+    if (error) {
+      setSyncState("error");
+      return;
+    }
+
+    if (data.length === 0 && tasks.length > 0) {
+      const { error: importError } = await supabase
+        .from("tasks")
+        .upsert(tasks.map((task) => toRow(task, userId)), { onConflict: "user_id,id" });
+      if (importError) {
+        setSyncState("error");
+        return;
+      }
+    } else if (data.length > 0) {
+      setTasks((data as TaskRow[]).map(fromRow));
+    }
+    setSyncState("synced");
+  }
+
+  async function saveCloudTask(task: Task) {
+    if (!supabase || !session) return;
+    setSyncState("syncing");
+    const { error } = await supabase
+      .from("tasks")
+      .upsert(toRow(task, session.user.id), { onConflict: "user_id,id" });
+    setSyncState(error ? "error" : "synced");
+  }
+
+  const activeTasks = useMemo(
     () => tasks.filter((task) => !task.done).sort((a, b) => score(b) - score(a)),
     [tasks],
   );
-  const visible = filter === "All courses" ? active : active.filter((task) => task.course === filter);
-  const focusTask = active[0];
+  const visible = filter === "All courses" ? activeTasks : activeTasks.filter((task) => task.course === filter);
+  const focusTask = activeTasks[0];
   const completed = tasks.filter((task) => task.done).length;
   const courses = Array.from(new Set([...Object.keys(COURSE_COLORS), ...tasks.map((task) => task.course)]));
 
   function addTask(event: FormEvent) {
     event.preventDefault();
     if (!title.trim()) return;
-    setTasks((current) => [
-      ...current,
-      { id: crypto.randomUUID(), title: title.trim(), course, due, effort, importance, done: false, createdAt: Date.now() },
-    ]);
+    const newTask: Task = {
+      id: crypto.randomUUID(),
+      title: title.trim(),
+      course,
+      due,
+      effort,
+      importance,
+      done: false,
+      createdAt: Date.now(),
+    };
+    setTasks((current) => [...current, newTask]);
+    void saveCloudTask(newTask);
     setTitle("");
     setDue(dateOffset(1));
     setEffort(2);
@@ -108,8 +220,44 @@ export default function Home() {
   }
 
   function toggleTask(id: string) {
-    setTasks((current) => current.map((task) => task.id === id ? { ...task, done: !task.done } : task));
+    const existing = tasks.find((task) => task.id === id);
+    if (!existing) return;
+    const updated = { ...existing, done: !existing.done };
+    setTasks((current) => current.map((task) => task.id === id ? updated : task));
+    void saveCloudTask(updated);
   }
+
+  async function requestMagicLink(event: FormEvent) {
+    event.preventDefault();
+    setAuthError("");
+    if (!supabase) {
+      setAuthError("Cloud sync has not been connected yet.");
+      return;
+    }
+    const { error } = await supabase.auth.signInWithOtp({
+      email: authEmail,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    if (error) setAuthError(error.message);
+    else setAuthSent(true);
+  }
+
+  async function signOut() {
+    if (!supabase) return;
+    await supabase.auth.signOut();
+    setSession(null);
+    setSyncState("local");
+  }
+
+  const syncLabel = !supabaseConfigured
+    ? "Cloud setup needed"
+    : !session
+      ? "Saved on this device"
+      : syncState === "syncing"
+        ? "Syncing…"
+        : syncState === "error"
+          ? "Sync paused"
+          : "Synced across devices";
 
   return (
     <main>
@@ -119,7 +267,16 @@ export default function Home() {
           <span>Semester Focus</span>
         </a>
         <div className="header-actions">
-          <span className="saved-label"><span className="saved-dot" /> Saved on this device</span>
+          <span className={`saved-label ${syncState === "error" ? "sync-error" : ""}`}>
+            <span className="saved-dot" /> {syncLabel}
+          </span>
+          {session ? (
+            <button className="account-button" onClick={signOut} title="Sign out">
+              {session.user.email?.split("@")[0] || "Account"}
+            </button>
+          ) : (
+            <button className="account-button" onClick={() => setShowAuth(true)}>Sign in to sync</button>
+          )}
           <button className="add-button" onClick={() => setShowForm(true)}><span>＋</span> Add task</button>
         </div>
       </header>
@@ -131,7 +288,7 @@ export default function Home() {
             <h1>Good evening. Let&apos;s make<br />tomorrow feel lighter.</h1>
           </div>
           <div className="mini-stats" aria-label="Task summary">
-            <div><strong>{active.length}</strong><span>open</span></div>
+            <div><strong>{activeTasks.length}</strong><span>open</span></div>
             <div><strong>{completed}</strong><span>done</span></div>
           </div>
         </div>
@@ -144,15 +301,12 @@ export default function Home() {
                 <h2 id="focus-heading">{focusTask.title}</h2>
                 <div className="focus-meta">
                   <span className="course-dot" style={{ background: COURSE_COLORS[focusTask.course] || "#d07a4a" }} />
-                  {focusTask.course}<span className="separator">•</span>{dueLabel(focusTask.due)}<span className="separator">•</span>{focusTask.effort * 25} min
+                  {focusTask.course}<span>•</span>{dueLabel(focusTask.due)}<span>•</span>{focusTask.effort * 25} min
                 </div>
                 <p className="focus-reason">It&apos;s important, coming up soon, and finishing it will clear the most mental space.</p>
               </>
             ) : (
-              <>
-                <h2 id="focus-heading">You&apos;re all caught up.</h2>
-                <p className="focus-reason">Add your next assignment when it lands.</p>
-              </>
+              <><h2 id="focus-heading">You&apos;re all caught up.</h2><p className="focus-reason">Add your next assignment when it lands.</p></>
             )}
           </div>
           {focusTask && <button className="start-button" onClick={() => toggleTask(focusTask.id)}>Mark complete <span>→</span></button>}
@@ -169,7 +323,6 @@ export default function Home() {
               </select>
             </label>
           </div>
-
           <div className="task-list">
             {visible.map((task, index) => (
               <article className="task-row" key={task.id}>
@@ -209,6 +362,25 @@ export default function Home() {
             </div>
             <p className="form-note"><span>✦</span> We&apos;ll rank it using due date, importance, and effort.</p>
             <button className="submit-button" type="submit">Add to my plan <span>→</span></button>
+          </form>
+        </div>
+      )}
+
+      {showAuth && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setShowAuth(false)}>
+          <form className="task-form auth-form" onSubmit={requestMagicLink} onMouseDown={(event) => event.stopPropagation()}>
+            <div className="form-title"><div><p className="eyebrow">CLOUD SYNC</p><h2>Take your tasks anywhere</h2></div><button type="button" className="close" onClick={() => setShowAuth(false)} aria-label="Close">×</button></div>
+            {authSent ? (
+              <div className="auth-success"><span>✉</span><h3>Check your email</h3><p>Use the secure link we sent to {authEmail}. Your browser tasks will import automatically.</p></div>
+            ) : (
+              <>
+                <p className="auth-intro">Sign in with an email link to back up your plan and keep it in sync across your phone and computer.</p>
+                <label>Email address<input autoFocus type="email" required value={authEmail} onChange={(event) => setAuthEmail(event.target.value)} placeholder="you@example.com" /></label>
+                {authError && <p className="auth-error">{authError}</p>}
+                <button className="submit-button" type="submit">Email me a sign-in link <span>→</span></button>
+                <p className="privacy-note">No password needed. Your tasks stay private to your account.</p>
+              </>
+            )}
           </form>
         </div>
       )}
