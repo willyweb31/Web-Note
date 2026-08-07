@@ -25,3 +25,6 @@ The SQL schema and row-level security policies are included under
 `supabase/migrations`. After deploying, sign in from the app with an email link.
 Existing browser tasks are imported automatically when the cloud account is
 empty.
+
+Run both SQL files in `supabase/migrations` in filename order. The second
+migration adds user-created classes, color labels, and task assignments.
