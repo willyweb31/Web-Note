@@ -43,10 +43,18 @@ h1 { font-size: clamp(38px, 5vw, 62px); line-height: 1.12; letter-spacing: -.035
 .tasks-section { margin-top: 68px; }
 .section-heading { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 24px; }
 .section-heading h2 { font-size: 31px; margin: 0; letter-spacing: -.02em; }
+.class-controls { display: flex; align-items: flex-end; gap: 18px; }
+.new-class-button { border: 0; background: transparent; color: var(--green); padding: 9px 2px; font-size: 12px; font-weight: 700; border-bottom: 1px solid #9eb0a7; }
+.new-class-button:hover { border-color: var(--green); }
 .filter-label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 10px; }
 select, input { color: var(--ink); background: var(--white); border: 1px solid var(--line); border-radius: 3px; padding: 11px 12px; outline: none; }
 select:focus, input:focus { border-color: #779b8c; box-shadow: 0 0 0 3px rgba(39,92,73,.08); }
 .filter-label select { padding: 9px 34px 9px 12px; text-transform: none; letter-spacing: 0; }
+.class-strip { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 24px; }
+.class-chip { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 20px; padding: 7px 10px; background: rgba(255,255,255,.42); color: #56615c; font-size: 11px; }
+.class-chip > span { width: 8px; height: 8px; border-radius: 50%; }
+.class-chip small { min-width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; background: #e8e9e3; color: #7b847f; font-size: 9px; }
+.class-chip:hover, .class-chip.active { border-color: #7f9b8f; background: var(--white); color: var(--green); }
 .task-list { border-top: 1px solid #cfd2c9; }
 .task-row { display: grid; grid-template-columns: 30px 42px minmax(0, 1fr) auto; gap: 18px; align-items: center; padding: 25px 4px; border-bottom: 1px solid var(--line); transition: background .18s, padding .18s; }
 .task-row:hover { background: rgba(255,255,255,.45); padding-left: 12px; padding-right: 12px; }
@@ -88,6 +96,12 @@ select:focus, input:focus { border-color: #779b8c; box-shadow: 0 0 0 3px rgba(39
 .auth-success > span { display: inline-grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #e2ece7; color: var(--green); font-size: 20px; }
 .auth-success h3 { font-family: var(--font-serif); font-weight: 400; font-size: 24px; margin: 18px 0 8px; }
 .auth-success p { color: var(--muted); font-size: 13px; line-height: 1.6; margin: 0; }
+.class-form { width: min(500px, 100%); }
+.color-picker { border: 0; padding: 0; margin: 24px 0 28px; }
+.color-picker legend { color: #58635e; font-size: 11px; font-weight: 700; letter-spacing: .03em; margin-bottom: 11px; }
+.color-picker > div { display: flex; gap: 12px; flex-wrap: wrap; }
+.color-swatch { width: 30px; height: 30px; border-radius: 50%; border: 3px solid var(--white); box-shadow: 0 0 0 1px #c9ccc7; }
+.color-swatch:hover, .color-swatch.selected { box-shadow: 0 0 0 2px var(--ink); transform: scale(1.05); }
 @keyframes fade { from { opacity: 0; } }
 @keyframes rise { from { opacity: 0; transform: translateY(12px); } }
 @media (max-width: 760px) {
@@ -103,6 +117,7 @@ select:focus, input:focus { border-color: #779b8c; box-shadow: 0 0 0 3px rgba(39
   .start-button { width: 100%; display: flex; justify-content: space-between; }
   .tasks-section { margin-top: 52px; }
   .section-heading { align-items: flex-start; gap: 18px; }
+  .class-controls { align-items: flex-start; }
   .filter-label { flex-direction: column; align-items: flex-start; gap: 5px; }
   .task-row { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; }
   .rank { display: none; }
@@ -117,6 +132,7 @@ select:focus, input:focus { border-color: #779b8c; box-shadow: 0 0 0 3px rgba(39
   .mini-stats { margin-top: 28px; }
   .focus-card { min-height: 370px; }
   .section-heading { display: block; }
+  .class-controls { margin-top: 18px; justify-content: space-between; }
   .filter-label { margin-top: 18px; }
   .task-row { grid-template-columns: 25px 1fr; }
   .priority { grid-column: 2; justify-self: start; }
